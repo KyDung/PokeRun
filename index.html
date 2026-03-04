@@ -1,0 +1,2105 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PokéRun - Đua Pokémon Gọi Tên</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Montserrat:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+      :root {
+        --lane-h: 80px;
+      }
+
+      body {
+        font-family: "Montserrat", sans-serif;
+        background-color: #0f172a;
+        background-image:
+          radial-gradient(
+            at 0% 0%,
+            rgba(251, 191, 36, 0.15) 0px,
+            transparent 50%
+          ),
+          radial-gradient(
+            at 100% 100%,
+            rgba(220, 38, 38, 0.15) 0px,
+            transparent 50%
+          );
+        background-attachment: fixed;
+        color: white;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        overflow-x: hidden;
+        margin: 0;
+        padding: 20px;
+      }
+
+      /* Glassmorphism */
+      .glass-panel {
+        background: rgba(15, 23, 42, 0.78);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      }
+
+      /* Settings panel */
+      .settings-panel {
+        overflow: hidden;
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 380px;
+        opacity: 1;
+        flex-shrink: 0;
+      }
+      .settings-collapsed {
+        max-width: 0;
+        opacity: 0;
+        padding: 0;
+        margin: 0;
+        border: none;
+      }
+
+      /* Class buttons */
+      .class-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+        gap: 0.5rem;
+        max-height: 200px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      .class-btn {
+        background: #1e293b;
+        color: #cbd5e1;
+        padding: 8px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        text-align: center;
+        transition: all 0.2s;
+        border: 1px solid #334155;
+      }
+      .class-btn:hover {
+        background: #334155;
+        transform: translateY(-1px);
+      }
+      .class-btn.active {
+        background: #2563eb;
+        color: white;
+        border-color: #60a5fa;
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0f172a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+      }
+
+      /* Range */
+      input[type="range"] {
+        -webkit-appearance: none;
+        background: transparent;
+        width: 100%;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 18px;
+        width: 18px;
+        border-radius: 50%;
+        background: #f59e0b;
+        margin-top: -7px;
+        cursor: pointer;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 4px;
+        background: #334155;
+        border-radius: 2px;
+      }
+      .speed-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: #64748b;
+        margin-top: 4px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      /* ═══════════════════════════════ RACE TRACK ═══════════════════════════════ */
+      #raceTrack {
+        position: relative;
+        background: linear-gradient(
+          180deg,
+          #14532d 0%,
+          #166534 55%,
+          #15803d 100%
+        );
+        border-radius: 14px;
+        border: 3px solid #713f12;
+        overflow: hidden;
+        min-height: 160px;
+      }
+      /* Grass stripes – scrolls during race */
+      #raceTrack::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(
+          90deg,
+          transparent 0px,
+          transparent 40px,
+          rgba(0, 120, 0, 0.18) 40px,
+          rgba(0, 120, 0, 0.18) 80px
+        );
+        background-size: 80px 100%;
+        background-repeat: repeat-x;
+        pointer-events: none;
+        z-index: 0;
+      }
+      @keyframes track-scroll {
+        from {
+          background-position-x: 0px;
+        }
+        to {
+          background-position-x: -80px;
+        }
+      }
+      #raceTrack.is-racing::after {
+        animation: track-scroll 0.6s linear infinite;
+      }
+
+      /* Scrolling grass strip at bottom of track */
+      #grassStrip {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 22px;
+        background: repeating-linear-gradient(
+          90deg,
+          #15803d 0px,
+          #166534 10px,
+          #14532d 10px,
+          #1a7a3e 20px,
+          #1a7a3e 20px,
+          #15803d 30px,
+          #14532d 30px,
+          #166534 40px
+        );
+        background-size: 40px 100%;
+        border-top: 2px solid rgba(0, 0, 0, 0.35);
+        z-index: 3;
+        pointer-events: none;
+      }
+      @keyframes grass-scroll {
+        from {
+          background-position-x: 0px;
+        }
+        to {
+          background-position-x: -40px;
+        }
+      }
+      #grassStrip.is-racing {
+        animation: grass-scroll 0.28s linear infinite;
+      }
+
+      .race-lane {
+        height: var(--lane-h);
+        position: relative;
+        display: flex;
+        align-items: center;
+        z-index: 2;
+      }
+      .race-lane:nth-child(odd) {
+        background: rgba(0, 0, 0, 0.06);
+      }
+
+      .lane-num {
+        width: 38px;
+        flex-shrink: 0;
+        text-align: center;
+        font-family: "Press Start 2P", monospace;
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.45);
+        z-index: 3;
+      }
+
+      /* Pokemon racer */
+      .poke-racer {
+        position: absolute;
+        left: 46px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 6;
+        will-change: transform;
+      }
+
+      .poke-name {
+        font-size: 10px;
+        font-weight: 900;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        padding: 2px 8px;
+        border-radius: 20px;
+        white-space: nowrap;
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 1px;
+        line-height: 1.5;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .poke-sprite {
+        width: 64px;
+        height: 64px;
+        image-rendering: pixelated;
+        transform: scaleX(-1);
+        filter: drop-shadow(2px 4px 4px rgba(0, 0, 0, 0.6));
+        pointer-events: none;
+      }
+
+      /* Finish line */
+      #finishLine {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 100px;
+        width: 10px;
+        background: repeating-linear-gradient(
+          to bottom,
+          #000 0px,
+          #000 8px,
+          #fff 8px,
+          #fff 16px
+        );
+        z-index: 4;
+        box-shadow:
+          0 0 18px rgba(255, 255, 255, 0.5),
+          0 0 6px rgba(255, 255, 255, 0.8);
+      }
+      #finishFlag {
+        position: absolute;
+        top: -20px;
+        left: -3px;
+        font-size: 20px;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+      }
+      #startMarker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 46px;
+        width: 2px;
+        background: rgba(255, 255, 255, 0.15);
+        z-index: 3;
+      }
+
+      /* Crown */
+      .crown-badge {
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 18px;
+        animation: crown-bounce 0.4s ease infinite alternate;
+        z-index: 20;
+      }
+      @keyframes crown-bounce {
+        from {
+          transform: translateX(-50%) translateY(0);
+        }
+        to {
+          transform: translateX(-50%) translateY(-5px);
+        }
+      }
+
+      /* Countdown overlay */
+      #countdown {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.78);
+        z-index: 50;
+        justify-content: center;
+        align-items: center;
+        border-radius: 12px;
+      }
+      #countdownNum {
+        font-family: "Press Start 2P", monospace;
+        font-size: clamp(3.5rem, 12vw, 6rem);
+        color: #fbbf24;
+        text-shadow:
+          0 0 40px #f59e0b,
+          0 5px 0 #92400e;
+        animation: count-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      @keyframes count-pop {
+        from {
+          transform: scale(2.2);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      /* Race button */
+      #raceBtn {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        border-radius: 9999px;
+        padding: 14px 44px;
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: white;
+        box-shadow: 0 8px 0 #7f1d1d;
+        transition: all 0.1s;
+        letter-spacing: 0.06em;
+        border: none;
+        cursor: pointer;
+      }
+      #raceBtn:not(:disabled):active {
+        box-shadow: 0 3px 0 #7f1d1d;
+        transform: translateY(5px);
+      }
+      #raceBtn:not(:disabled):hover {
+        filter: brightness(1.12);
+      }
+      #raceBtn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: translateY(3px);
+      }
+
+      /* Title */
+      .poke-title {
+        font-family: "Press Start 2P", monospace;
+        font-size: clamp(1.3rem, 4vw, 2.2rem);
+        background: linear-gradient(
+          180deg,
+          #fde68a 0%,
+          #f59e0b 50%,
+          #d97706 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        filter: drop-shadow(0 3px 0 rgba(120, 53, 15, 0.9));
+        letter-spacing: 0.06em;
+      }
+
+      /* ─── Track wrapper ─── */
+      #trackScroller {
+        border-radius: 14px;
+        scroll-behavior: smooth;
+      }
+      #trackScroller::-webkit-scrollbar {
+        width: 8px;
+      }
+      #trackScroller::-webkit-scrollbar-track {
+        background: #0f172a;
+        border-radius: 4px;
+      }
+      #trackScroller::-webkit-scrollbar-thumb {
+        background: #713f12;
+        border-radius: 4px;
+      }
+      #trackScroller::-webkit-scrollbar-thumb:hover {
+        background: #92400e;
+      }
+
+      /* ─── Winner Modal ─── */
+      #winnerModal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.88);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        z-index: 9999;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+      #winnerModalBox {
+        background: linear-gradient(145deg, #1c1117, #2d1a06, #1c1117);
+        border: 2px solid #fbbf24;
+        border-radius: 24px;
+        padding: 40px 48px;
+        text-align: center;
+        position: relative;
+        max-width: 520px;
+        width: 100%;
+        box-shadow:
+          0 0 80px rgba(251, 191, 36, 0.4),
+          0 0 0 1px rgba(255, 255, 255, 0.05);
+        animation: modal-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        overflow: hidden;
+      }
+      #winnerModalBox::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.05),
+          transparent
+        );
+        animation: shimmer 3s infinite;
+        pointer-events: none;
+      }
+      @keyframes modal-pop {
+        from {
+          transform: scale(0.6) translateY(40px);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1) translateY(0);
+          opacity: 1;
+        }
+      }
+      @keyframes shimmer {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(100%);
+        }
+      }
+      @keyframes banner-pop {
+        from {
+          transform: scale(0.7);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      #winnerNameText {
+        font-size: clamp(1.8rem, 5vw, 3rem);
+        font-weight: 900;
+        color: #fff;
+        text-shadow:
+          0 0 30px rgba(251, 191, 36, 0.9),
+          0 2px 0 rgba(0, 0, 0, 0.5);
+        position: relative;
+        line-height: 1.2;
+      }
+      .modal-close-btn {
+        position: absolute;
+        top: 14px;
+        right: 18px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #9ca3af;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-close-btn:hover {
+        background: rgba(255, 255, 255, 0.18);
+        color: white;
+      }
+      .modal-race-again-btn {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        border-radius: 9999px;
+        padding: 12px 36px;
+        font-size: 1rem;
+        font-weight: 900;
+        color: white;
+        box-shadow: 0 6px 0 #7f1d1d;
+        transition: all 0.1s;
+        border: none;
+        cursor: pointer;
+        letter-spacing: 0.06em;
+        margin-top: 24px;
+      }
+      .modal-race-again-btn:active {
+        box-shadow: 0 2px 0 #7f1d1d;
+        transform: translateY(4px);
+      }
+      .modal-race-again-btn:hover {
+        filter: brightness(1.1);
+      }
+
+      @keyframes pokeball-spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .pokeball-icon {
+        animation: pokeball-spin 4s linear infinite;
+        display: inline-block;
+      }
+
+      /* Dust particles on race start */
+      .dust-puff {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        background: rgba(200, 180, 130, 0.8);
+        border-radius: 50%;
+        pointer-events: none;
+        animation: dust-fade 0.6s ease-out forwards;
+        z-index: 7;
+      }
+      /* ─── Mute button ─── */
+      #muteBtn {
+        position: absolute;
+        top: 10px;
+        right: 52px;
+        z-index: 20;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #e2e8f0;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      #muteBtn:hover {
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      /* ─── Fullscreen button ─── */
+      #fullscreenBtn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 20;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #e2e8f0;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      #fullscreenBtn:hover {
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      /* When game area is fullscreen, fill the whole viewport */
+      #gameArea:fullscreen,
+      #gameArea:-webkit-full-screen {
+        background: #0f172a;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow: hidden;
+      }
+      #raceArea:fullscreen,
+      #raceArea:-webkit-full-screen {
+        background: #0f172a;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow: hidden;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+      #gameArea:fullscreen #raceTrack,
+      #gameArea:-webkit-full-screen #raceTrack,
+      #raceArea:fullscreen #raceTrack,
+      #raceArea:-webkit-full-screen #raceTrack {
+        height: calc(100vh - 130px) !important;
+      }
+
+      @keyframes dust-fade {
+        0% {
+          transform: scale(1) translate(0, 0);
+          opacity: 0.8;
+        }
+        100% {
+          transform: scale(3) translate(-15px, -10px);
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Main Wrapper -->
+    <div
+      class="w-full max-w-7xl flex flex-col md:flex-row gap-6 relative items-start"
+      id="mainContainer"
+      style="transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1)"
+    >
+      <!-- Floating expand btn -->
+      <button
+        onclick="toggleSettings()"
+        id="expandBtn"
+        class="hidden absolute top-0 left-0 z-20 bg-yellow-500 text-black p-3 rounded-full shadow-lg hover:bg-yellow-400 transition transform hover:scale-110"
+        title="Mở cài đặt"
+      >
+        <i class="fa-solid fa-gear fa-lg"></i>
+      </button>
+
+      <!-- ══════════ SETTINGS PANEL ══════════ -->
+      <div
+        id="settingsPanel"
+        class="settings-panel w-full glass-panel rounded-2xl flex flex-col"
+      >
+        <div class="p-5 flex-grow overflow-y-auto">
+          <!-- Header -->
+          <div class="flex justify-between items-center mb-5">
+            <h2
+              class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400"
+            >
+              <i class="fa-solid fa-sliders"></i> Cấu hình
+            </h2>
+            <button
+              onclick="toggleSettings()"
+              class="text-gray-400 hover:text-white transition"
+              title="Thu gọn"
+            >
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex bg-gray-900/80 p-1 rounded-xl mb-5 text-xs">
+            <button
+              onclick="switchTab('manual')"
+              id="btn-manual"
+              class="flex-1 py-2 rounded-lg font-bold bg-yellow-500 text-black shadow-md transition-all"
+            >
+              Nhập tay
+            </button>
+            <button
+              onclick="switchTab('sheet')"
+              id="btn-sheet"
+              class="flex-1 py-2 rounded-lg font-bold text-gray-400 hover:text-white transition-all"
+            >
+              1 Lớp
+            </button>
+            <button
+              onclick="switchTab('classes')"
+              id="btn-classes"
+              class="flex-1 py-2 rounded-lg font-bold text-gray-400 hover:text-white transition-all"
+            >
+              QL Lớp
+            </button>
+          </div>
+
+          <!-- Tab 1: Manual -->
+          <div id="tab-manual" class="tab-content mb-4">
+            <textarea
+              id="manualInput"
+              rows="8"
+              class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-sm focus:border-yellow-500 transition resize-none"
+              placeholder="Nhập tên học sinh (mỗi dòng một tên)..."
+            ></textarea>
+            <div class="flex justify-between mt-2 text-xs text-gray-500">
+              <span>Tự động lưu vào bộ nhớ</span>
+              <span id="manualCount" class="text-yellow-400 font-bold"
+                >0 học sinh</span
+              >
+            </div>
+          </div>
+
+          <!-- Tab 2: Single Sheet -->
+          <div id="tab-sheet" class="tab-content hidden mb-4">
+            <input
+              type="text"
+              id="sheetUrl"
+              class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-sm mb-3 focus:border-green-500 transition"
+              placeholder="Dán link Google Sheet lớp..."
+            />
+            <button
+              onclick="loadFromSingleSheet()"
+              class="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl font-bold transition shadow-lg flex justify-center items-center gap-2 group"
+            >
+              <i
+                class="fa-solid fa-cloud-arrow-down group-hover:-translate-y-1 transition"
+              ></i>
+              Tải dữ liệu
+              <span id="sheetLoading" class="hidden animate-spin ml-2"
+                ><i class="fa-solid fa-circle-notch"></i
+              ></span>
+            </button>
+            <p class="text-xs text-gray-500 mt-3 text-center">
+              Yêu cầu: Sheet Công khai. Lấy dữ liệu cột A.
+            </p>
+          </div>
+
+          <!-- Tab 3: Class Manager -->
+          <div id="tab-classes" class="tab-content hidden mb-4">
+            <div class="mb-3">
+              <label class="text-xs text-gray-400 mb-1 block"
+                >Link Master Sheet (Cột A: Tên Lớp, Cột B: Link Data
+                Lớp):</label
+              >
+              <div class="flex gap-2">
+                <input
+                  type="text"
+                  id="masterSheetUrl"
+                  class="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm focus:border-purple-500 transition"
+                  placeholder="Dán link Sheet tổng..."
+                />
+                <button
+                  onclick="loadMasterSheet()"
+                  class="bg-purple-600 hover:bg-purple-700 px-3 rounded-lg text-white font-bold transition"
+                  title="Tải danh sách lớp"
+                >
+                  <i class="fa-solid fa-sync"></i>
+                </button>
+              </div>
+            </div>
+            <div class="mb-2 flex justify-between items-end">
+              <span class="text-xs text-gray-300 font-bold"
+                >Danh sách lớp:</span
+              >
+              <button
+                onclick="clearClasses()"
+                class="text-[10px] text-red-400 hover:text-red-300 underline"
+              >
+                Xóa hết
+              </button>
+            </div>
+            <div
+              id="classButtonsContainer"
+              class="class-grid bg-gray-900/50 p-2 rounded-xl border border-gray-700 min-h-[100px]"
+            >
+              <div
+                class="col-span-full text-center text-gray-500 text-xs py-4 italic"
+              >
+                Chưa có lớp. Nhập link master sheet để tải.
+              </div>
+            </div>
+          </div>
+
+          <!-- Race Config -->
+          <div
+            class="bg-gray-900/50 p-4 rounded-xl border border-gray-700 mt-4 space-y-4"
+          >
+            <div>
+              <div class="flex justify-between mb-1">
+                <span class="text-sm font-bold text-gray-300">Tốc độ đua</span>
+                <span class="text-xs text-yellow-400 font-mono" id="speedLabel"
+                  >Chuẩn (1.0x)</span
+                >
+              </div>
+              <input
+                type="range"
+                id="speedRange"
+                min="0.5"
+                max="2.5"
+                step="0.5"
+                value="1"
+                oninput="updateSpeedLabel(this.value)"
+              />
+              <div class="speed-row">
+                <span>Nhanh</span><span>Chuẩn</span><span>Chậm</span>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between mb-1">
+                <span class="text-sm font-bold text-gray-300"
+                  >Số đấu thủ đua</span
+                >
+                <span
+                  class="text-xs text-yellow-400 font-mono"
+                  id="racerCountLabel"
+                  >6</span
+                >
+              </div>
+              <input
+                type="range"
+                id="racerCount"
+                min="2"
+                max="60"
+                step="1"
+                value="6"
+                oninput="
+                  document.getElementById('racerCountLabel').innerText =
+                    this.value
+                "
+              />
+              <div class="speed-row">
+                <span>2</span><span>30</span><span>60</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Stats -->
+        <div
+          class="p-4 border-t border-gray-700/50 bg-gray-900/50 rounded-b-2xl"
+        >
+          <div class="flex justify-between items-center text-sm text-gray-400">
+            <div class="flex flex-col">
+              <span class="text-[10px] uppercase text-gray-500 font-bold"
+                >Lớp đang chọn:</span
+              >
+              <span
+                id="currentClassDisplay"
+                class="font-bold text-yellow-400 truncate max-w-[150px]"
+                >Chưa chọn</span
+              >
+            </div>
+            <span
+              id="totalStudents"
+              class="text-white font-bold bg-gray-700 px-3 py-1 rounded-lg shadow"
+              >0 HS</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ GAME AREA ══════════ -->
+      <div class="flex-grow flex flex-col gap-5 min-w-0" id="gameArea">
+        <!-- Title -->
+        <div class="text-center select-none">
+          <div class="poke-title">⚡ POKÉRUN ⚡</div>
+          <p
+            id="mainHeaderSub"
+            class="text-yellow-500/60 text-xs font-bold tracking-[0.2em] uppercase mt-2"
+          >
+            CHỌN LỚP ĐỂ BẮT ĐẦU
+          </p>
+        </div>
+
+        <!-- Track card + Race button wrapped for fullscreen -->
+        <div
+          id="raceArea"
+          class="glass-panel rounded-2xl p-4"
+          style="position: relative"
+        >
+          <!-- Mute button -->
+          <button id="muteBtn" onclick="toggleMute()" title="Bật/Tắt âm thanh">
+            <i id="muteIcon" class="fa-solid fa-volume-high"></i>
+          </button>
+          <!-- Fullscreen button -->
+          <button
+            id="fullscreenBtn"
+            onclick="toggleFullscreen()"
+            title="Toàn màn hình"
+          >
+            <i id="fullscreenIcon" class="fa-solid fa-expand"></i>
+          </button>
+
+          <div style="position: relative">
+            <!-- Countdown overlay (outside scroller so it covers full visible area) -->
+            <div
+              id="countdown"
+              style="
+                display: none;
+                position: absolute;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.82);
+                z-index: 50;
+                justify-content: center;
+                align-items: center;
+                border-radius: 14px;
+              "
+            >
+              <div
+                id="countdownNum"
+                style="
+                  font-family: &quot;Press Start 2P&quot;, monospace;
+                  font-size: clamp(3.5rem, 12vw, 6rem);
+                  color: #fbbf24;
+                  text-shadow:
+                    0 0 40px #f59e0b,
+                    0 5px 0 #92400e;
+                  animation: count-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+                "
+              ></div>
+            </div>
+
+            <!-- Scrollable track wrapper -->
+            <div id="trackScroller">
+              <!-- Race Track -->
+              <div id="raceTrack">
+                <div id="startMarker"></div>
+                <div id="finishLine"><span id="finishFlag">🏁</span></div>
+                <div id="lanesContainer"></div>
+                <div id="grassStrip"></div>
+
+                <!-- Placeholder -->
+                <div
+                  id="trackPlaceholder"
+                  class="flex items-center justify-center py-16 text-gray-500"
+                  style="position: relative; z-index: 5"
+                >
+                  <div class="text-center">
+                    <div class="text-5xl mb-3 pokeball-icon">🏅</div>
+                    <p class="font-bold text-sm">
+                      Tải danh sách học sinh để bắt đầu!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Race Button -->
+          <div class="mt-5 flex justify-center">
+            <button id="raceBtn" onclick="startRaceSequence()" disabled>
+              <i class="fa-solid fa-flag-checkered mr-2"></i>
+              <span id="raceBtnText">BẮT ĐẦU ĐUA!</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ WINNER MODAL (fixed full-screen) ══════════ -->
+    <div id="winnerModal">
+      <div id="winnerModalBox">
+        <!-- Close button -->
+        <button
+          class="modal-close-btn"
+          onclick="closeWinnerModal()"
+          title="Đóng"
+        >
+          ✕
+        </button>
+
+        <!-- Trophy icon -->
+        <div style="font-size: 4rem; line-height: 1; margin-bottom: 8px">
+          🏆
+        </div>
+        <p
+          style="
+            color: rgba(253, 230, 138, 0.8);
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+          "
+        >
+          Người chiến thắng
+        </p>
+
+        <!-- Sprite -->
+        <img
+          id="winnerSprite"
+          src=""
+          alt=""
+          style="
+            display: block;
+            width: 100px;
+            height: 100px;
+            image-rendering: pixelated;
+            transform: scaleX(-1);
+            filter: drop-shadow(0 0 16px rgba(250, 176, 5, 0.7))
+              drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+            margin: 0 auto 12px auto;
+          "
+        />
+
+        <!-- Name -->
+        <div id="winnerNameText">---</div>
+        <p
+          id="winnerPokeName"
+          style="
+            color: rgba(251, 191, 36, 0.5);
+            font-size: 11px;
+            margin-top: 6px;
+            font-family: monospace;
+          "
+        ></p>
+
+        <!-- Race again button -->
+        <button
+          class="modal-race-again-btn"
+          onclick="
+            closeWinnerModal();
+            startRaceSequence();
+          "
+        >
+          <i class="fa-solid fa-flag-checkered mr-2"></i>ĐUA LẠI!
+        </button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         SCRIPT
+    ══════════════════════════════════════════════════════ -->
+    <script>
+      // ─── LocalStorage Keys ───
+      const LS = {
+        MODE: "poke_mode",
+        MANUAL_DATA: "poke_manual_data",
+        SINGLE_URL: "poke_single_sheet_url",
+        MASTER_URL: "poke_master_sheet_url",
+        CLASSES_LIST: "poke_classes_list",
+        CLASS_NAME: "poke_current_class_name",
+        STUDENT_LIST: "poke_current_student_list",
+      };
+
+      // ─── Pokemon Pool (Gen-1, all have Gen-5 animated sprites) ───
+      const POKEMON_POOL = [
+        // Gen 1
+        { id: 1, name: "Bulbasaur" },
+        { id: 4, name: "Charmander" },
+        { id: 7, name: "Squirtle" },
+        { id: 10, name: "Caterpie" },
+        { id: 12, name: "Butterfree" },
+        { id: 16, name: "Pidgey" },
+        { id: 19, name: "Rattata" },
+        { id: 21, name: "Spearow" },
+        { id: 23, name: "Ekans" },
+        { id: 25, name: "Pikachu" },
+        { id: 27, name: "Sandshrew" },
+        { id: 29, name: "Nidoran♀" },
+        { id: 32, name: "Nidoran♂" },
+        { id: 35, name: "Clefairy" },
+        { id: 37, name: "Vulpix" },
+        { id: 39, name: "Jigglypuff" },
+        { id: 41, name: "Zubat" },
+        { id: 43, name: "Oddish" },
+        { id: 46, name: "Paras" },
+        { id: 48, name: "Venonat" },
+        { id: 50, name: "Diglett" },
+        { id: 52, name: "Meowth" },
+        { id: 54, name: "Psyduck" },
+        { id: 56, name: "Mankey" },
+        { id: 58, name: "Growlithe" },
+        { id: 60, name: "Poliwag" },
+        { id: 63, name: "Abra" },
+        { id: 66, name: "Machop" },
+        { id: 72, name: "Tentacool" },
+        { id: 74, name: "Geodude" },
+        { id: 77, name: "Ponyta" },
+        { id: 79, name: "Slowpoke" },
+        { id: 81, name: "Magnemite" },
+        { id: 84, name: "Doduo" },
+        { id: 86, name: "Seel" },
+        { id: 88, name: "Grimer" },
+        { id: 90, name: "Shellder" },
+        { id: 92, name: "Gastly" },
+        { id: 94, name: "Gengar" },
+        { id: 96, name: "Drowzee" },
+        { id: 98, name: "Krabby" },
+        { id: 100, name: "Voltorb" },
+        { id: 104, name: "Cubone" },
+        { id: 106, name: "Hitmonlee" },
+        { id: 107, name: "Hitmonchan" },
+        { id: 109, name: "Koffing" },
+        { id: 111, name: "Rhyhorn" },
+        { id: 113, name: "Chansey" },
+        { id: 114, name: "Tangela" },
+        { id: 116, name: "Horsea" },
+        { id: 118, name: "Goldeen" },
+        { id: 120, name: "Staryu" },
+        { id: 129, name: "Magikarp" },
+        { id: 131, name: "Lapras" },
+        { id: 133, name: "Eevee" },
+        { id: 137, name: "Porygon" },
+        { id: 143, name: "Snorlax" },
+        { id: 147, name: "Dratini" },
+        { id: 150, name: "Mewtwo" },
+        { id: 151, name: "Mew" },
+        // Gen 2
+        { id: 152, name: "Chikorita" },
+        { id: 155, name: "Cyndaquil" },
+        { id: 158, name: "Totodile" },
+        { id: 161, name: "Sentret" },
+        { id: 163, name: "Hoothoot" },
+        { id: 172, name: "Pichu" },
+        { id: 173, name: "Cleffa" },
+        { id: 174, name: "Igglybuff" },
+        { id: 175, name: "Togepi" },
+        { id: 179, name: "Mareep" },
+        { id: 183, name: "Marill" },
+        { id: 187, name: "Hoppip" },
+        { id: 191, name: "Sunkern" },
+        { id: 194, name: "Wooper" },
+        { id: 196, name: "Espeon" },
+        { id: 197, name: "Umbreon" },
+        { id: 199, name: "Slowking" },
+        { id: 202, name: "Wobbuffet" },
+        { id: 206, name: "Dunsparce" },
+        { id: 209, name: "Snubbull" },
+        { id: 215, name: "Sneasel" },
+        { id: 216, name: "Teddiursa" },
+        { id: 220, name: "Swinub" },
+        { id: 226, name: "Mantine" },
+        { id: 231, name: "Phanpy" },
+        { id: 234, name: "Stantler" },
+        { id: 235, name: "Smeargle" },
+        { id: 241, name: "Miltank" },
+        { id: 246, name: "Larvitar" },
+        { id: 249, name: "Lugia" },
+        { id: 250, name: "Ho-Oh" },
+        { id: 251, name: "Celebi" },
+      ];
+
+      const SPRITE_URL = (id) =>
+        `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
+      const STATIC_URL = (id) =>
+        `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+
+      // ─── State ───
+      let studentList = [];
+      let classList = [];
+      let currentMode = "manual";
+      let isRacing = false;
+      let raceRAF = null;
+      let currentRacers = [];
+      let RACER_SLOT = 40; // px per racer row, computed dynamically in renderLanes
+
+      // ═══════════════════════════════════════════════
+      //  INIT
+      // ═══════════════════════════════════════════════
+      window.onload = () => loadFromStorage();
+
+      function loadFromStorage() {
+        const manual = localStorage.getItem(LS.MANUAL_DATA);
+        if (manual) document.getElementById("manualInput").value = manual;
+
+        document.getElementById("sheetUrl").value =
+          localStorage.getItem(LS.SINGLE_URL) || "";
+        document.getElementById("masterSheetUrl").value =
+          localStorage.getItem(LS.MASTER_URL) || "";
+
+        const savedClasses = localStorage.getItem(LS.CLASSES_LIST);
+        if (savedClasses) {
+          try {
+            classList = JSON.parse(savedClasses);
+            renderClassButtons();
+          } catch (e) {}
+        }
+
+        const savedMode = localStorage.getItem(LS.MODE) || "manual";
+        switchTab(savedMode);
+
+        const savedList = localStorage.getItem(LS.STUDENT_LIST);
+        const savedName =
+          localStorage.getItem(LS.CLASS_NAME) || "Danh sách lưu";
+        if (savedList) {
+          try {
+            studentList = JSON.parse(savedList);
+            updateUIState(savedName);
+          } catch (e) {
+            console.error(e);
+          }
+        } else if (savedMode === "manual" && manual) {
+          updateDataFromManual();
+        }
+      }
+
+      const save = (k, v) => localStorage.setItem(k, v);
+
+      // ═══════════════════════════════════════════════
+      //  SETTINGS PANEL
+      // ═══════════════════════════════════════════════
+      function toggleSettings() {
+        const panel = document.getElementById("settingsPanel");
+        const btn = document.getElementById("expandBtn");
+        if (panel.classList.contains("settings-collapsed")) {
+          panel.classList.remove("settings-collapsed");
+          btn.classList.add("hidden");
+        } else {
+          panel.classList.add("settings-collapsed");
+          setTimeout(() => btn.classList.remove("hidden"), 400);
+        }
+      }
+
+      function updateSpeedLabel(val) {
+        const labels = {
+          0.5: "Nhanh (0.5x)",
+          1: "Chuẩn (1.0x)",
+          1.5: "Chậm (1.5x)",
+          2: "Rất chậm (2.0x)",
+          2.5: "Rùa bò (2.5x)",
+        };
+        document.getElementById("speedLabel").innerText =
+          labels[val] || "Chuẩn";
+      }
+
+      function switchTab(tab) {
+        currentMode = tab;
+        save(LS.MODE, tab);
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((el) => el.classList.add("hidden"));
+        document.getElementById(`tab-${tab}`).classList.remove("hidden");
+        ["manual", "sheet", "classes"].forEach((id) => {
+          document.getElementById(`btn-${id}`).className =
+            "flex-1 py-2 rounded-lg font-bold text-gray-400 hover:text-white transition-all";
+        });
+        const ab = document.getElementById(`btn-${tab}`);
+        ab.className =
+          "flex-1 py-2 rounded-lg font-bold bg-yellow-500 text-black shadow-md transition-all";
+        if (tab === "manual") updateDataFromManual();
+      }
+
+      // ═══════════════════════════════════════════════
+      //  DATA: MANUAL
+      // ═══════════════════════════════════════════════
+      document.getElementById("manualInput").addEventListener("input", () => {
+        save(LS.MANUAL_DATA, document.getElementById("manualInput").value);
+        if (currentMode === "manual") updateDataFromManual();
+      });
+
+      function updateDataFromManual() {
+        studentList = document
+          .getElementById("manualInput")
+          .value.split("\n")
+          .map((l) => l.trim())
+          .filter((l) => l);
+        save(LS.STUDENT_LIST, JSON.stringify(studentList));
+        save(LS.CLASS_NAME, "Danh sách nhập tay");
+        updateUIState("Danh sách nhập tay");
+      }
+
+      // ═══════════════════════════════════════════════
+      //  DATA: SINGLE SHEET
+      // ═══════════════════════════════════════════════
+      async function loadFromSingleSheet() {
+        const url = document.getElementById("sheetUrl").value.trim();
+        if (!url) {
+          alert("Vui lòng nhập link!");
+          return;
+        }
+        save(LS.SINGLE_URL, url);
+        const spin = document.getElementById("sheetLoading");
+        spin.classList.remove("hidden");
+        const data = await fetchGviz(url, 0);
+        spin.classList.add("hidden");
+        if (data) {
+          studentList = data;
+          save(LS.STUDENT_LIST, JSON.stringify(data));
+          save(LS.CLASS_NAME, "1 Lớp (Link)");
+          alert(`Đã tải ${data.length} học sinh!`);
+          updateUIState("1 Lớp (Link)");
+          toggleSettings();
+        }
+      }
+
+      // ═══════════════════════════════════════════════
+      //  DATA: MASTER SHEET
+      // ═══════════════════════════════════════════════
+      async function loadMasterSheet() {
+        const url = document.getElementById("masterSheetUrl").value.trim();
+        if (!url) {
+          alert("Vui lòng nhập Link Master Sheet!");
+          return;
+        }
+        save(LS.MASTER_URL, url);
+        const icon = document.querySelector("#tab-classes i.fa-sync");
+        icon.classList.add("fa-spin");
+        try {
+          const sheetId = extractId(url),
+            gid = extractGid(url);
+          if (!sheetId) throw new Error("Link không hợp lệ");
+          let gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=1`;
+          if (gid) gvizUrl += `&gid=${gid}`;
+          const res = await fetch(gvizUrl);
+          const txt = await res.text();
+          const json = JSON.parse(
+            txt.substring(txt.indexOf("{"), txt.lastIndexOf("}") + 1),
+          );
+          const newClasses = [];
+          json.table.rows.forEach((row) => {
+            if (row.c?.[0]?.v && row.c?.[1]?.v)
+              newClasses.push({
+                name: row.c[0].v.toString().trim(),
+                url: row.c[1].v.toString().trim(),
+              });
+          });
+          if (!newClasses.length) {
+            alert("Không tìm thấy dữ liệu. Cột A: Tên Lớp, Cột B: Link.");
+          } else {
+            classList = newClasses;
+            save(LS.CLASSES_LIST, JSON.stringify(classList));
+            renderClassButtons();
+            alert(`Đã tìm thấy ${newClasses.length} lớp!`);
+          }
+        } catch (e) {
+          console.error(e);
+          alert("Lỗi tải Master Sheet: " + e.message);
+        } finally {
+          icon.classList.remove("fa-spin");
+        }
+      }
+
+      function renderClassButtons() {
+        const c = document.getElementById("classButtonsContainer");
+        c.innerHTML = "";
+        if (!classList.length) {
+          c.innerHTML =
+            '<div class="col-span-full text-center text-gray-500 text-xs py-4 italic">Chưa có lớp nào.</div>';
+          return;
+        }
+        classList.forEach((cls) => {
+          const btn = document.createElement("button");
+          btn.className = "class-btn";
+          btn.innerText = cls.name;
+          btn.title = "Tải lớp " + cls.name;
+          btn.onclick = (e) => loadClassStudents(cls, e.currentTarget);
+          c.appendChild(btn);
+        });
+      }
+
+      async function loadClassStudents(classObj, btnEl) {
+        document
+          .querySelectorAll(".class-btn")
+          .forEach((b) => b.classList.remove("active"));
+        btnEl.classList.add("active");
+        const panel = document.getElementById("settingsPanel");
+        const overlay = document.createElement("div");
+        overlay.style.cssText =
+          "position:absolute;inset:0;background:rgba(0,0,0,0.6);display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:1rem;z-index:50";
+        overlay.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-yellow-400 text-3xl mb-2"></i><span class="text-white text-xs font-bold">Đang tải ${classObj.name}...</span>`;
+        panel.style.position = "relative";
+        panel.appendChild(overlay);
+        const data = await fetchGviz(classObj.url, 0);
+        overlay.remove();
+        if (data) {
+          studentList = data;
+          save(LS.STUDENT_LIST, JSON.stringify(data));
+          save(LS.CLASS_NAME, classObj.name);
+          updateUIState(classObj.name);
+          if (
+            window.innerWidth < 768 &&
+            !panel.classList.contains("settings-collapsed")
+          )
+            toggleSettings();
+        }
+      }
+
+      function clearClasses() {
+        if (confirm("Xóa danh sách lớp đã lưu?")) {
+          classList = [];
+          localStorage.removeItem(LS.CLASSES_LIST);
+          renderClassButtons();
+        }
+      }
+
+      // ═══════════════════════════════════════════════
+      //  GVIZ HELPERS
+      // ═══════════════════════════════════════════════
+      const extractId = (url) => {
+        const m = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        return m?.[1] ?? null;
+      };
+      const extractGid = (url) => {
+        const m = url.match(/[?&#]gid=([0-9]+)/);
+        return m?.[1] ?? null;
+      };
+
+      async function fetchGviz(url, col) {
+        try {
+          const id = extractId(url),
+            gid = extractGid(url);
+          if (!id) throw new Error("Link không hợp lệ");
+          let gviz = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json&headers=1`;
+          if (gid) gviz += `&gid=${gid}`;
+          const res = await fetch(gviz);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const txt = await res.text();
+          const json = JSON.parse(
+            txt.substring(txt.indexOf("{"), txt.lastIndexOf("}") + 1),
+          );
+          if (json.status === "error")
+            throw new Error(json.errors[0].detailed_message);
+          const list = [];
+          json.table.rows.forEach((r) => {
+            if (r.c?.[col]?.v) list.push(r.c[col].v.toString().trim());
+          });
+          if (list.length) {
+            const f = list[0].toLowerCase();
+            const hdrs = [
+              "tên học sinh",
+              "họ và tên",
+              "họ tên",
+              "name",
+              "student name",
+              "tên",
+              "stt",
+              "full name",
+            ];
+            if (hdrs.some((h) => f === h || f.includes(h))) {
+              console.log("Removed header:", list[0]);
+              list.shift();
+            }
+          }
+          if (!list.length)
+            throw new Error("Sheet rỗng / không có dữ liệu cột A");
+          return list;
+        } catch (e) {
+          console.error(e);
+          alert(
+            `Lỗi tải dữ liệu: ${e.message}\n\nHãy kiểm tra Link và quyền truy cập (Công khai).`,
+          );
+          return null;
+        }
+      }
+
+      // ═══════════════════════════════════════════════
+      //  UI STATE
+      // ═══════════════════════════════════════════════
+      function updateUIState(name) {
+        const n = studentList.length;
+        document.getElementById("totalStudents").innerText = `${n} HS`;
+        document.getElementById("manualCount").innerText = `${n} học sinh`;
+        document.getElementById("currentClassDisplay").innerText =
+          name || "Chưa chọn lớp";
+        document.getElementById("mainHeaderSub").innerText = (
+          name || "Chọn lớp để bắt đầu"
+        ).toUpperCase();
+
+        if (n > 0) {
+          document.getElementById("raceBtn").disabled = false;
+          document.getElementById("raceBtnText").innerText = "BẮT ĐẦU ĐUA!";
+          document.getElementById("trackPlaceholder").style.display = "none";
+          // Auto-sync slider to actual student count (capped at max=60)
+          const slider = document.getElementById("racerCount");
+          const autoN = Math.min(n, parseInt(slider.max));
+          slider.value = autoN;
+          document.getElementById("racerCountLabel").innerText = autoN;
+          buildTrack();
+        } else {
+          document.getElementById("raceBtn").disabled = true;
+          document.getElementById("raceBtnText").innerText = "CHƯA CÓ DATA";
+          document.getElementById("trackPlaceholder").style.display = "flex";
+          document.getElementById("lanesContainer").innerHTML = "";
+        }
+      }
+
+      // ═══════════════════════════════════════════════
+      //  RACE ENGINE
+      // ═══════════════════════════════════════════════
+      function shuffle(arr) {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      function buildTrack() {
+        const n = Math.min(
+          parseInt(document.getElementById("racerCount").value),
+          studentList.length,
+        );
+        const students = shuffle(studentList).slice(0, n);
+        const pokemons = shuffle(POKEMON_POOL).slice(0, n);
+
+        currentRacers = students.map((name, i) => ({
+          studentName: name,
+          pokemon: pokemons[i],
+          progress: 0,
+          finished: false,
+          isWinner: false,
+        }));
+
+        renderLanes(currentRacers);
+      }
+
+      function renderLanes(racers) {
+        const n = racers.length;
+        const vh = window.innerHeight;
+        // Fixed track height — capped at 75vh so the page never scrolls vertically.
+        // Pokémon overlap on Y freely since it's a pack, not individual lanes.
+        const trackH = Math.min(Math.max(Math.round(vh * 0.75), 320), 800);
+        RACER_SLOT = Math.max(10, Math.round(trackH / n));
+
+        document.getElementById("raceTrack").style.height = trackH + "px";
+        document.getElementById("raceTrack").style.minHeight = "";
+
+        const c = document.getElementById("lanesContainer");
+        c.innerHTML = "";
+        c.style.cssText =
+          "position:relative;width:100%;height:" + trackH + "px;";
+
+        const centerY = trackH / 2;
+
+        racers.forEach((r, i) => {
+          const racer = document.createElement("div");
+          racer.className = "poke-racer";
+          racer.id = `racer-${i}`;
+
+          // Distribute tightly around center Y + random Y nudge (overlap OK)
+          // Clamped so all racers stay within visible track height
+          const rawY =
+            centerY +
+            (i - (n - 1) / 2) * RACER_SLOT -
+            40 +
+            Math.round((Math.random() - 0.5) * RACER_SLOT * 1.8);
+          const baseY = Math.max(4, Math.min(rawY, trackH - 84));
+          // Spread racers 0..+220px forward from start for a wide chaotic cluster
+          const jitterX = Math.round(Math.random() * 220);
+
+          // Store on racer object for use in beginRace / spawnDust
+          r.baseY = baseY;
+          r.startX = jitterX;
+
+          racer.style.cssText = `transform:translateX(${jitterX}px);top:${baseY}px;`;
+
+          const nameTag = document.createElement("div");
+          nameTag.className = "poke-name";
+          nameTag.innerText = r.studentName;
+          racer.appendChild(nameTag);
+
+          const img = document.createElement("img");
+          img.className = "poke-sprite";
+          img.src = SPRITE_URL(r.pokemon.id);
+          img.alt = r.pokemon.name;
+          img.onerror = function () {
+            this.src = STATIC_URL(r.pokemon.id);
+            this.onerror = null;
+          };
+          racer.appendChild(img);
+
+          c.appendChild(racer);
+        });
+      }
+
+      // ─── Countdown + Race sequence ───
+      function closeWinnerModal() {
+        const modal = document.getElementById("winnerModal");
+        modal.style.display = "none";
+        // Restore modal to body if it was moved into the fullscreen container
+        if (modal.parentElement !== document.body) {
+          document.body.appendChild(modal);
+        }
+      }
+
+      // ─── Audio (Web Audio API — no external files needed) ───
+      let isMuted = false;
+      let audioCtx = null;
+      let bgLoopTimeout = null;
+      let bgGain = null;
+
+      function getAudioCtx() {
+        if (!audioCtx)
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return audioCtx;
+      }
+
+      // ── Background chiptune melody ──
+      // Notes: freq in Hz, dur in beats (1 beat = BPM-based seconds)
+      const BG_BPM = 148;
+      const BG_BEAT = 60 / BG_BPM;
+      const BG_MELODY = [
+        // Lively 8-bar loop in C major
+        [523, 1],
+        [659, 1],
+        [784, 1],
+        [880, 0.5],
+        [784, 0.5],
+        [659, 1],
+        [523, 1],
+        [392, 1],
+        [440, 1],
+        [523, 1],
+        [659, 1],
+        [784, 1],
+        [1047, 1],
+        [880, 0.5],
+        [784, 0.5],
+        [659, 1],
+        [523, 1],
+        [392, 1],
+        [523, 1],
+        [784, 1],
+        [659, 1],
+        [880, 0.5],
+        [784, 0.5],
+        [1047, 1],
+        [880, 1],
+        [784, 1],
+        [659, 1],
+        [523, 0.5],
+        [659, 0.5],
+        [784, 0.5],
+        [880, 0.5],
+        [1047, 1],
+        [880, 1],
+        [784, 1],
+        [659, 1],
+        [523, 2],
+      ];
+
+      let bgPlaying = false;
+      let bgScheduled = [];
+
+      function playBgMusic() {
+        if (isMuted || bgPlaying) return;
+        bgPlaying = true;
+        _scheduleBgLoop();
+      }
+
+      function _scheduleBgLoop() {
+        if (!bgPlaying || isMuted) return;
+        const ctx = getAudioCtx();
+        if (ctx.state === "suspended") ctx.resume();
+        const master = ctx.createGain();
+        master.gain.value = 0.18;
+        master.connect(ctx.destination);
+        bgGain = master;
+
+        let t = ctx.currentTime + 0.05;
+        let totalDur = 0;
+        BG_MELODY.forEach(([freq, beats]) => {
+          const dur = beats * BG_BEAT;
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = "square";
+          osc.frequency.value = freq;
+          g.gain.setValueAtTime(0.8, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.85);
+          osc.connect(g);
+          g.connect(master);
+          osc.start(t);
+          osc.stop(t + dur * 0.85);
+          bgScheduled.push(osc);
+          t += dur;
+          totalDur += dur;
+        });
+        // Loop: reschedule after full melody plays
+        bgLoopTimeout = setTimeout(
+          () => {
+            if (bgPlaying && !isMuted) _scheduleBgLoop();
+          },
+          totalDur * 1000 - 80,
+        );
+      }
+
+      function stopBgMusic() {
+        bgPlaying = false;
+        clearTimeout(bgLoopTimeout);
+        bgScheduled.forEach((o) => {
+          try {
+            o.stop();
+          } catch (e) {}
+        });
+        bgScheduled = [];
+        if (bgGain) {
+          bgGain.gain.value = 0;
+          bgGain = null;
+        }
+      }
+
+      // ── Winner fanfare ──
+      function playWinSound() {
+        if (isMuted) return;
+        const ctx = getAudioCtx();
+        if (ctx.state === "suspended") ctx.resume();
+        const master = ctx.createGain();
+        master.gain.value = 0.55;
+        master.connect(ctx.destination);
+        // Ascending arpeggio C5-E5-G5-C6 then long C6
+        [
+          [523, 0],
+          [659, 0.12],
+          [784, 0.24],
+          [1047, 0.38],
+          [1047, 0.58],
+        ].forEach(([freq, delay], idx) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = idx === 4 ? "sine" : "triangle";
+          osc.frequency.value = freq;
+          const t = ctx.currentTime + delay;
+          const dur = idx === 4 ? 1.2 : 0.18;
+          g.gain.setValueAtTime(0.9, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+          osc.connect(g);
+          g.connect(master);
+          osc.start(t);
+          osc.stop(t + dur);
+        });
+      }
+
+      // ── Countdown beep ──
+      function playCountdownBeep(isGo) {
+        if (isMuted) return;
+        const ctx = getAudioCtx();
+        if (ctx.state === "suspended") ctx.resume();
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = isGo ? 1047 : 440; // C6 for GO, A4 for 3-2-1
+        const t = ctx.currentTime;
+        const dur = isGo ? 0.55 : 0.18;
+        g.gain.setValueAtTime(0.7, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + dur);
+      }
+
+      function toggleMute() {
+        isMuted = !isMuted;
+        const icon = document.getElementById("muteIcon");
+        if (isMuted) {
+          stopBgMusic();
+          if (icon) icon.className = "fa-solid fa-volume-xmark";
+        } else {
+          if (isRacing) playBgMusic();
+          if (icon) icon.className = "fa-solid fa-volume-high";
+        }
+      }
+
+      function toggleFullscreen() {
+        const el = document.getElementById("raceArea");
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+        } else {
+          (document.exitFullscreen || document.webkitExitFullscreen).call(
+            document,
+          );
+        }
+      }
+      document.addEventListener("fullscreenchange", () => {
+        const icon = document.getElementById("fullscreenIcon");
+        if (icon)
+          icon.className = document.fullscreenElement
+            ? "fa-solid fa-compress"
+            : "fa-solid fa-expand";
+        // Recalculate track height after entering/leaving fullscreen
+        if (currentRacers.length) renderLanes(currentRacers);
+      });
+
+      async function startRaceSequence() {
+        if (isRacing) return;
+        closeWinnerModal();
+        buildTrack();
+        await doCountdown();
+        beginRace();
+      }
+
+      function doCountdown() {
+        return new Promise((resolve) => {
+          const overlay = document.getElementById("countdown");
+          const numEl = document.getElementById("countdownNum");
+          overlay.style.display = "flex";
+          const steps = ["3", "2", "1", "GO!"];
+          let idx = 0;
+          function tick() {
+            numEl.textContent = steps[idx];
+            numEl.style.animation = "none";
+            void numEl.offsetWidth;
+            numEl.style.animation =
+              "count-pop 0.7s cubic-bezier(0.34,1.56,0.64,1)";
+            playCountdownBeep(steps[idx] === "GO!");
+            idx++;
+            if (idx < steps.length) {
+              setTimeout(tick, 800);
+            } else {
+              setTimeout(() => {
+                overlay.style.display = "none";
+                resolve();
+              }, 500);
+            }
+          }
+          tick();
+        });
+      }
+
+      function beginRace() {
+        if (!currentRacers.length) return;
+        isRacing = true;
+        document.getElementById("raceBtn").disabled = true;
+        document.getElementById("raceBtnText").innerText = "ĐANG ĐUA...";
+
+        const speedFactor = parseFloat(
+          document.getElementById("speedRange").value,
+        );
+        const BASE_MS = 7500 * speedFactor;
+        // Phase 1: whole group runs in a pack (background scrolls, racers oscillate)
+        const PHASE1_MS = BASE_MS * 0.52;
+        // Phase 2a: winner alone sprints to finish
+        const PHASE2_WINNER_MS = Math.round(BASE_MS * 0.2);
+        // Phase 2b: no delay — others start moving immediately after winner finishes
+        const OTHERS_DELAY_MS = 0;
+        const PHASE2_OTHERS_MS = Math.round(BASE_MS * 0.28);
+
+        const winIdx = Math.floor(Math.random() * currentRacers.length);
+        currentRacers[winIdx].isWinner = true;
+
+        const track = document.getElementById("raceTrack");
+        const trackW = track.clientWidth;
+        const finishX = trackW - 46 - 122; // max translateX (finish line)
+        // Cluster hovers around 65% of the track in phase 1
+        const clusterX = Math.round(finishX * 0.65);
+
+        // Each racer's phase-1 cluster X — spread across 50%–80% of track for wide pack feel
+        const max80 = Math.round(finishX * 0.9); // hard cap for non-winners
+        currentRacers.forEach((r) => {
+          r.clusterX = Math.round(finishX * (0.5 + Math.random() * 0.3));
+          // Phase-2 destination: winner goes to finish, others stop ≤ 80% of track
+          r.destX = r.isWinner
+            ? finishX
+            : Math.min(
+                max80,
+                Math.round(
+                  r.clusterX +
+                    (max80 - r.clusterX) * (0.5 + Math.random() * 0.5),
+                ),
+              );
+          r.progress = 0;
+          r.finished = false;
+        });
+
+        spawnDust();
+        playBgMusic();
+        track.classList.add("is-racing");
+        document.getElementById("grassStrip")?.classList.add("is-racing");
+
+        const startTime = performance.now();
+        let resolved = false;
+        let winnerFinishTime = null; // perf.now() when winner crosses finish
+
+        function frame(now) {
+          const elapsed = now - startTime;
+
+          if (elapsed < PHASE1_MS) {
+            // ── Phase 1: group running in a pack ──
+            const t1 = elapsed / PHASE1_MS;
+            const eased = easeOther(t1);
+            currentRacers.forEach((r, i) => {
+              const el = document.getElementById(`racer-${i}`);
+              if (!el) return;
+              const x =
+                r.startX +
+                (r.clusterX - r.startX) * eased +
+                Math.sin(elapsed / 170 + i * 1.1) * 7;
+              el.style.transform = `translateX(${x}px)`;
+              const dy = Math.sin(elapsed / 240 + i * 1.4) * 3;
+              el.style.top = r.baseY + dy + "px";
+            });
+          } else {
+            // ── Phase 2a: winner sprints alone to finish ──
+            const p2e = elapsed - PHASE1_MS;
+            const winnerT = Math.min(p2e / PHASE2_WINNER_MS, 1);
+            const winner = currentRacers[winIdx];
+            const winEl = document.getElementById(`racer-${winIdx}`);
+            if (winEl) {
+              const x =
+                winner.clusterX +
+                (finishX - winner.clusterX) * easeWinner(winnerT);
+              winEl.style.transform = `translateX(${x}px)`;
+              winEl.style.top = winner.baseY + "px";
+            }
+            if (winnerT >= 1 && !winnerFinishTime) {
+              winnerFinishTime = now;
+            }
+
+            // ── Phase 2b: others drift in 1.5s after winner finishes ──
+            if (winnerFinishTime !== null) {
+              const sinceFin = now - winnerFinishTime;
+              if (sinceFin >= OTHERS_DELAY_MS) {
+                const othersT = Math.min(
+                  (sinceFin - OTHERS_DELAY_MS) / PHASE2_OTHERS_MS,
+                  1,
+                );
+                currentRacers.forEach((r, i) => {
+                  if (i === winIdx) return;
+                  const el = document.getElementById(`racer-${i}`);
+                  if (!el) return;
+                  const x =
+                    r.clusterX + (r.destX - r.clusterX) * easeOther(othersT);
+                  el.style.transform = `translateX(${x}px)`;
+                  el.style.top = r.baseY + "px";
+                });
+                if (othersT >= 1 && !resolved) {
+                  resolved = true;
+                  setTimeout(() => finishRace(winIdx), 400);
+                  return;
+                }
+              }
+            }
+          }
+
+          if (!resolved) raceRAF = requestAnimationFrame(frame);
+        }
+        raceRAF = requestAnimationFrame(frame);
+      }
+
+      // ─── Easing functions ───
+      function easeOther(t) {
+        // smooth ease in-out quad
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      }
+      function easeWinner(t) {
+        // Slower start, burst at 75% mark for drama
+        if (t < 0.75) {
+          return easeOther(t / 0.75) * 0.78;
+        } else {
+          const p = (t - 0.75) / 0.25;
+          // Accelerating sprint to finish
+          return 0.78 + (1 - Math.pow(1 - p, 3)) * 0.22;
+        }
+      }
+
+      function spawnDust() {
+        const track = document.getElementById("raceTrack");
+        currentRacers.forEach((r, i) => {
+          for (let j = 0; j < 3; j++) {
+            const dust = document.createElement("div");
+            dust.className = "dust-puff";
+            dust.style.left = 50 + Math.random() * 20 + "px";
+            // Use stored baseY so dust appears at the actual racer position
+            dust.style.top = r.baseY + 50 + Math.random() * 16 - 8 + "px";
+            dust.style.animationDelay = j * 0.1 + "s";
+            track.appendChild(dust);
+            setTimeout(() => dust.remove(), 800);
+          }
+        });
+      }
+
+      function finishRace(winIdx) {
+        if (raceRAF) cancelAnimationFrame(raceRAF);
+        isRacing = false;
+        stopBgMusic();
+        playWinSound();
+        document.getElementById("raceTrack").classList.remove("is-racing");
+        document.getElementById("grassStrip")?.classList.remove("is-racing");
+
+        const winner = currentRacers[winIdx];
+
+        // Crown on winner
+        const wEl = document.getElementById(`racer-${winIdx}`);
+        if (wEl) {
+          const crown = document.createElement("div");
+          crown.className = "crown-badge";
+          crown.innerText = "👑";
+          wEl.appendChild(crown);
+        }
+
+        // Show winner modal — move inside fullscreen container if active so it
+        // renders on top of the fullscreen layer
+        document.getElementById("winnerNameText").innerText =
+          winner.studentName;
+        document.getElementById("winnerPokeName").innerText =
+          `Cưỡi: ${winner.pokemon.name} (Pokémon #${winner.pokemon.id})`;
+
+        const wSprite = document.getElementById("winnerSprite");
+        wSprite.src = SPRITE_URL(winner.pokemon.id);
+        wSprite.onerror = function () {
+          this.src = STATIC_URL(winner.pokemon.id);
+          this.onerror = null;
+        };
+
+        const modal = document.getElementById("winnerModal");
+        const modalBox = document.getElementById("winnerModalBox");
+
+        // Reparent modal into fullscreen container so position:fixed covers it
+        const fsEl =
+          document.fullscreenElement || document.webkitFullscreenElement;
+        if (fsEl && !fsEl.contains(modal)) fsEl.appendChild(modal);
+
+        modal.style.display = "flex";
+        modalBox.style.animation = "none";
+        void modalBox.offsetWidth;
+        modalBox.style.animation =
+          "modal-pop 0.5s cubic-bezier(0.34,1.56,0.64,1)";
+
+        // Scroll winner into view
+        const wRacer = document.getElementById(`racer-${winIdx}`);
+        if (wRacer)
+          wRacer.scrollIntoView({ behavior: "smooth", block: "center" });
+
+        // Confetti party 🎉
+        confetti({
+          particleCount: 150,
+          spread: 90,
+          origin: { y: 0.5 },
+          colors: ["#fbbf24", "#ef4444", "#3b82f6", "#22c55e", "#a855f7"],
+        });
+        setTimeout(
+          () =>
+            confetti({
+              particleCount: 80,
+              angle: 60,
+              spread: 65,
+              origin: { x: 0 },
+            }),
+          350,
+        );
+        setTimeout(
+          () =>
+            confetti({
+              particleCount: 80,
+              angle: 120,
+              spread: 65,
+              origin: { x: 1 },
+            }),
+          350,
+        );
+        setTimeout(
+          () =>
+            confetti({
+              particleCount: 60,
+              spread: 120,
+              origin: { y: 0.3 },
+              scalar: 1.5,
+              shapes: ["star"],
+              colors: ["#fbbf24", "#fff"],
+            }),
+          700,
+        );
+
+        // Re-enable
+        document.getElementById("raceBtn").disabled = false;
+        document.getElementById("raceBtnText").innerText = "ĐUA LẠI!";
+      }
+    </script>
+  </body>
+</html>
